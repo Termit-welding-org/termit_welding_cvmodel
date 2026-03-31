@@ -1,0 +1,5 @@
+stages:
+  check_dataset:
+    cmd: echo "Dataset ready"
+    deps:
+      - data/raw/welding-defect-object-detection

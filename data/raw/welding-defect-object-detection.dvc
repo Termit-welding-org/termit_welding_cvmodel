@@ -1,0 +1,6 @@
+outs:
+- md5: 3ca18b10862dc68c36d479f1b226a2b2.dir
+  size: 103089526
+  nfiles: 4057
+  hash: md5
+  path: welding-defect-object-detection
