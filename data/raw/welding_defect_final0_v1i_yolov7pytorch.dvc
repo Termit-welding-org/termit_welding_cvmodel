@@ -1,0 +1,6 @@
+outs:
+- md5: 9ca4c687397c311acda6bb0635fece52.dir
+  size: 339828926
+  nfiles: 9919
+  hash: md5
+  path: welding_defect_final0_v1i_yolov7pytorch
