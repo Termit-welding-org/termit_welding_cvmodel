@@ -1,0 +1,6 @@
+outs:
+- md5: 2d5deb9f29744930c88cac596bf817f6.dir
+  size: 76579254
+  nfiles: 1497
+  hash: md5
+  path: TWDDv2_sorted_by_class
