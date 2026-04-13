@@ -1,6 +1,6 @@
 outs:
-- md5: e2ec78d70cfa239184ff4da93e76a88a.dir
-  size: 103089526
-  nfiles: 4057
+- md5: dcdec9674d728801fed9868302e05c1f.dir
+  size: 101860794
+  nfiles: 4007
   hash: md5
   path: The-Welding-Defect-Dataset-v2
