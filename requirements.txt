@@ -1,0 +1,24 @@
+# AI/ML
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics==8.3.70
+
+# Компьютерное зрение
+opencv-python==4.9.0.80
+numpy==1.26.4
+pillow>=10.0.0
+
+# Данные и визуализация
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Веб-фреймворки
+streamlit>=1.25.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# Утилиты
+pyyaml>=6.0
+tqdm>=4.65.0
