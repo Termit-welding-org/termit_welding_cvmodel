@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Termit Weld CV - Профессиональная система контроля сварки
-Расширенная аналитика: F1/F2/F3, кривые по классам, PR-кривые
-"""
 
 import streamlit as st
 try:
@@ -359,17 +355,35 @@ def render_report_window(detections, image_name, processing_time, model_name, co
 
 def render_inspection():
     st.markdown("### Загрузка изображения")
-    uploaded = st.file_uploader("", type=["jpg", "jpeg", "png", "bmp"], label_visibility="collapsed")
-
-    if not uploaded:
-        st.info("Загрузите изображение сварного шва для анализа")
-        return None, False, ""
-
-    image = Image.open(uploaded)
-    st.image(image, use_container_width=True)
-
-    if st.button("АНАЛИЗИРОВАТЬ", type="primary", use_container_width=True):
-        return image, True, uploaded.name
+    
+    # Заметная область загрузки с рамкой и инструкцией
+    st.markdown("""
+    <div style="
+        border: 3px dashed #000000;
+        background: #fafafa;
+        padding: 50px 30px;
+        text-align: center;
+        margin: 20px 0;
+        cursor: pointer;
+    ">
+        <p style="font-size: 20px; font-weight: 700; margin: 0 0 15px 0; color: #000;">ПЕРЕТАЩИТЕ ФАЙЛ СЮДА</p>
+        <p style="font-size: 16px; color: #666; margin: 0 0 10px 0;">или нажмите кнопку ниже</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    uploaded = st.file_uploader(
+        "Добавить изображение",
+        type=["jpg","jpeg","png","bmp"],
+        label_visibility="visible"
+    )
+    
+    if uploaded:
+        image = Image.open(uploaded)
+        st.image(image, use_container_width=True)
+        
+        if st.button("АНАЛИЗИРОВАТЬ", type="primary", use_container_width=True):
+            return image, True, uploaded.name
+    
     return None, False, ""
 
 
