@@ -3,8 +3,8 @@ torch>=2.0.0
 torchvision>=0.15.0
 ultralytics==8.3.70
 
-# Компьютерное зрение
-opencv-python==4.9.0.80
+# Компьютерное зрение (headless для облака)
+opencv-python-headless==4.9.0.80
 numpy==1.26.4
 pillow>=10.0.0
 
@@ -15,9 +15,7 @@ seaborn>=0.12.0
 
 # Веб-фреймворки
 streamlit>=1.25.0
-fastapi>=0.100.0
-uvicorn>=0.23.0
-python-multipart>=0.0.6
+plotly>=5.0.0
 
 # Утилиты
 pyyaml>=6.0
