@@ -1,0 +1,12 @@
+
+# Dataset for weld defect detection
+path: D:\PycharmProjects\termit_welding_cvmodel\data
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 1
+
+# Class names
+names: ['weld_defect']

@@ -1,0 +1,15 @@
+# data.yaml
+path: C:/Users/User/PycharmProjects/termit_welding_cvmodel/data/processed
+
+train: train/images
+val: val/images
+test: test/images
+
+# Количество классов (настройте под ваш датасет)
+nc: 3
+
+# Имена классов
+names:
+  0: good_weld
+  1: bad_weld
+  2: defect
