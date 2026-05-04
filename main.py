@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-def check_dependencies(command=None):  # ← Добавлен параметр
+def check_dependencies(command=None):
     """Проверка зависимостей"""
     modules = {
         'torch': 'torch',
@@ -18,26 +18,26 @@ def check_dependencies(command=None):  # ← Добавлен параметр
         'streamlit': 'streamlit'
     }
 
-    print("\n Проверка зависимостей:")
+    print("\nПроверка зависимостей:")
     all_ok = True
 
     for module, name in modules.items():
         try:
             __import__(module)
-            print(f"  {name}")
+            print(f"  {name} - OK")
         except ImportError:
-            print(f"  {name}")
+            print(f"  {name} - НЕ УСТАНОВЛЕН")
             all_ok = False
 
     if not all_ok:
-        print("\nУстановите: pip install opencv-python")
+        print("\nУстановите: pip install -r requirements.txt")
 
     return all_ok
 
 
 def predict(args):
     """Инференс"""
-    if not check_dependencies('predict'):  # Теперь функция принимает аргумент
+    if not check_dependencies('predict'):
         return
 
     try:
@@ -47,61 +47,58 @@ def predict(args):
         image_path = args.image
 
         if not image_path:
-            print(" Укажите --image")
+            print("Укажите --image")
             return
 
         print(f"Модель: {model_path}")
         print(f"Изображение: {image_path}")
 
         model = YOLO(model_path)
-        results = model.predict(image_path, conf=0.35, save=True)
+        results = model.predict(image_path, conf=args.conf, save=True)
 
         for r in results:
             boxes = r.boxes
             if boxes is not None and len(boxes) > 0:
-                print(f"\n Найдено объектов: {len(boxes)}")
+                print(f"\nНайдено объектов: {len(boxes)}")
                 for box in boxes:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
                     cls_name = model.names[cls_id]
                     print(f"  - {cls_name}: {conf:.2f}")
             else:
-                print("\n Объекты не найдены")
+                print("\nОбъекты не найдены")
 
-        print(f"\n Результат сохранен в: runs/detect/predict/")
+        print(f"\nРезультат сохранен в: runs/detect/predict/")
 
     except ImportError as e:
-        print(f" Ошибка импорта: {e}")
+        print(f"Ошибка импорта: {e}")
     except Exception as e:
-        print(f" Ошибка: {e}")
+        print(f"Ошибка: {e}")
 
 
 def train(args):
     """Обучение модели"""
     print("\n" + "=" * 60)
-    print("🚀 ЗАПУСК ОБУЧЕНИЯ YOLO")
+    print("ЗАПУСК ОБУЧЕНИЯ YOLO")
     print("=" * 60)
 
     try:
         from ultralytics import YOLO
 
-        # Проверяем data.yaml
         data_yaml = args.data_yaml or 'data.yaml'
 
         if not Path(data_yaml).exists():
-            print(f"❌ Файл не найден: {data_yaml}")
+            print(f"Файл не найден: {data_yaml}")
             return
 
-        print(f"📁 Датасет: {data_yaml}")
-        print(f"⚙️ Эпохи: {args.epochs}")
-        print(f"📦 Батч: {args.batch}")
+        print(f"Датасет: {data_yaml}")
+        print(f"Эпохи: {args.epochs}")
+        print(f"Батч: {args.batch}")
 
-        # Загружаем модель
-        print("\n📥 Загрузка модели yolov8m.pt...")
+        print("\nЗагрузка модели yolov8m.pt...")
         model = YOLO('yolov8m.pt')
 
-        # Запускаем обучение
-        print("\n🔥 Начинаем обучение...")
+        print("\nНачинаем обучение...")
         results = model.train(
             data=data_yaml,
             epochs=args.epochs,
@@ -120,7 +117,6 @@ def train(args):
             weight_decay=0.0005,
             warmup_epochs=3,
 
-            # Аугментации
             hsv_h=0.015,
             hsv_s=0.7,
             hsv_v=0.4,
@@ -137,14 +133,15 @@ def train(args):
             verbose=True
         )
 
-        print("\n✅ Обучение завершено!")
-        print(f"📁 Модель сохранена: runs/detect/weld_detection/weights/best.pt")
+        print("\nОбучение завершено!")
+        print(f"Модель сохранена: runs/detect/weld_detection/weights/best.pt")
 
     except ImportError as e:
-        print(f"❌ Ошибка импорта: {e}")
+        print(f"Ошибка импорта: {e}")
         print("Установите: pip install ultralytics torch")
     except Exception as e:
-        print(f"❌ Ошибка обучения: {e}")
+        print(f"Ошибка обучения: {e}")
+
 
 def serve(args):
     """API сервер"""
