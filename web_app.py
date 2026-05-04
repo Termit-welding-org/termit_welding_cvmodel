@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+"""
+Termit Weld CV - Профессиональная система контроля сварки
+Расширенная аналитика: F1/F2/F3, кривые по классам, PR-кривые
+"""
 
 import streamlit as st
-try:
-    import cv2
-except ImportError:
-    pass
+#try:
+#    import cv2
+#except ImportError:
+#    pass
 import numpy as np
 from ultralytics import YOLO
 from PIL import Image
@@ -15,6 +19,9 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import torch
+torch.cuda.is_available = lambda: False
+torch.cuda.device_count = lambda: 0
 
 # ============================================
 # НАСТРОЙКА СТРАНИЦЫ
@@ -36,59 +43,34 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     * { font-family: 'Inter', sans-serif !important; }
     h1, h2, h3, h4 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; }
-    p, li, span, div, label { font-family: 'Inter', sans-serif !important; }
     .stApp { background: #ffffff; }
 
-    .header {
-        background: #000000; padding: 30px 35px; margin-bottom: 30px;
-        display: flex; align-items: center;
-    }
-    .header-logo {
-        background: #ffffff; color: #000000; font-size: 1.6rem; font-weight: 800;
-        width: 55px; height: 55px; display: flex; align-items: center;
-        justify-content: center; margin-right: 20px;
-    }
-    .header-text h1 { color: #ffffff !important; margin: 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; }
-    .header-text p { color: #999999 !important; margin: 5px 0 0 0; font-size: 1rem; font-weight: 400; }
+    .header { background: #000; padding: 30px 35px; margin-bottom: 30px; display: flex; align-items: center; }
+    .header-logo { background: #fff; color: #000; font-size: 1.6rem; font-weight: 800; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; margin-right: 20px; }
+    .header-text h1 { color: #fff !important; margin: 0; font-size: 2rem; font-weight: 800; }
+    .header-text p { color: #999 !important; margin: 5px 0 0 0; font-size: 1rem; font-weight: 400; }
 
-    .stat-card {
-        background: #ffffff; padding: 25px; border: 1px solid #e5e5e5; text-align: left;
-    }
-    .stat-card .number { font-size: 2.8rem; font-weight: 800; color: #000000; }
-    .stat-card .label { color: #888888 !important; font-size: 0.85rem; margin-top: 5px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+    .stat-card { background: #fff; padding: 25px; border: 1px solid #e5e5e5; text-align: left; }
+    .stat-card .number { font-size: 2.8rem; font-weight: 800; color: #000; }
+    .stat-card .label { color: #888 !important; font-size: 0.85rem; margin-top: 5px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
 
-    .stButton > button {
-        background: #000000 !important; color: #ffffff !important; border: none !important;
-        font-weight: 600 !important; padding: 12px 30px !important; font-size: 14px !important;
-        text-transform: uppercase !important; letter-spacing: 1px !important; transition: all 0.2s !important;
-    }
-    .stButton > button:hover { background: #333333 !important; }
+    .stButton > button { background: #000 !important; color: #fff !important; border: none !important; font-weight: 600 !important; padding: 12px 30px !important; font-size: 14px !important; text-transform: uppercase !important; letter-spacing: 1px !important; }
 
     [data-testid="stSidebar"] { background: #fafafa; border-right: 1px solid #e5e5e5; }
-    [data-testid="stSidebar"] * { color: #000000 !important; }
+    [data-testid="stSidebar"] * { color: #000 !important; }
 
-    .footer { border-top: 1px solid #e5e5e5; padding: 40px 0; margin-top: 50px; text-align: center; color: #888888; }
-
+    .footer { border-top: 1px solid #e5e5e5; padding: 40px 0; margin-top: 50px; text-align: center; color: #888; }
     .stTabs [data-baseweb="tab-list"] { gap: 0; background: transparent; padding: 0; border-bottom: 1px solid #e5e5e5; }
-    .stTabs [data-baseweb="tab"] { background: transparent; border-radius: 0; padding: 15px 25px; color: #888888 !important; font-weight: 500; border-bottom: 2px solid transparent; }
-    .stTabs [aria-selected="true"] { background: transparent !important; color: #000000 !important; border-bottom: 2px solid #000000; font-weight: 700; }
-
+    .stTabs [data-baseweb="tab"] { background: transparent; border-radius: 0; padding: 15px 25px; color: #888 !important; font-weight: 500; border-bottom: 2px solid transparent; }
+    .stTabs [aria-selected="true"] { background: transparent !important; color: #000 !important; border-bottom: 2px solid #000; font-weight: 700; }
     img { max-height: 450px !important; object-fit: contain !important; }
 
-    [data-testid="stFileUploader"] button { font-size: 0 !important; }
-    [data-testid="stFileUploader"] button::after { content: "ВЫБРАТЬ ФАЙЛ" !important; font-size: 14px !important; font-weight: 600 !important; letter-spacing: 1px !important; }
-    [data-testid="stFileUploader"] button small { display: none !important; }
-    [data-testid="stFileUploader"] svg { display: none !important; }
-    [data-testid="stFileUploader"] span { display: none !important; }
-    [data-testid="stFileUploader"] { border: 2px dashed #000000 !important; padding: 40px !important; background: #fafafa !important; }
+    [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
-
-# ============================================
-# RE-IMPORT (after st.set_page_config)
-# All imports remain at top
-# ============================================
-
 
 # ============================================
 # КЛАССЫ
@@ -137,7 +119,6 @@ def calculate_f_beta(precision, recall, beta=1.0):
 
 
 def get_metrics_for_confidence(conf):
-    """Получить метрики для заданного порога (усредненные)"""
     precs = [np.interp(conf, list(P_CURVE_PER_CLASS[c].keys()), list(P_CURVE_PER_CLASS[c].values())) for c in
              CLASSES_RU]
     recalls = [np.interp(conf, list(R_CURVE_PER_CLASS[c].keys()), list(R_CURVE_PER_CLASS[c].values())) for c in
@@ -176,15 +157,41 @@ def load_ensemble():
         return None, str(e)
 
 
-def predict_single(model, image, conf):
-    return model.predict(np.array(image), conf=conf, verbose=False)
-
-
 def predict_ensemble(models, image, conf):
-    nano, small = models
-    r1 = nano.predict(np.array(image), conf=conf, verbose=False)
-    r2 = small.predict(np.array(image), conf=conf, verbose=False)
-    return r1 if r1[0].boxes else r2
+    try:
+        nano, small = models
+        # Конвертируем изображение в RGB (убираем альфа-канал)
+        img_array = np.array(image)
+        if len(img_array.shape) == 3 and img_array.shape[2] == 4:
+            image = image.convert('RGB')
+        
+        r1 = nano.predict(np.array(image), conf=conf, verbose=False)
+        r2 = small.predict(np.array(image), conf=conf, verbose=False)
+        
+        # Ансамбль: объединяем результаты
+        if r1[0].boxes is None and r2[0].boxes is None:
+            return r1
+        if r1[0].boxes is None:
+            return r2
+        if r2[0].boxes is None:
+            return r1
+        
+        return r1 if len(r1[0].boxes) >= len(r2[0].boxes) else r2
+    except Exception as e:
+        st.error(f"Ошибка ансамбля: {e}")
+        return None
+
+
+def predict_single(model, image, conf):
+    try:
+        # Конвертируем в RGB (убираем альфа-канал)
+        img_array = np.array(image)
+        if len(img_array.shape) == 3 and img_array.shape[2] == 4:
+            image = image.convert('RGB')
+        return model.predict(np.array(image), conf=conf, verbose=False)
+    except Exception as e:
+        st.error(f"Ошибка предсказания: {e}")
+        return None
 
 
 # ============================================
@@ -279,7 +286,6 @@ def render_dashboard():
     for i, cls_name in enumerate(CLASSES_RU):
         prec_vals = list(P_CURVE_PER_CLASS[cls_name].values())
         rec_vals = list(R_CURVE_PER_CLASS[cls_name].values())
-        # Сортируем по recall
         sorted_pairs = sorted(zip(rec_vals, prec_vals))
         rec_sorted, prec_sorted = zip(*sorted_pairs)
 
@@ -289,7 +295,6 @@ def render_dashboard():
             line=dict(color=colors[i], width=2)
         ))
 
-    # Текущая точка
     fig_pr.add_trace(go.Scatter(
         x=[r], y=[p], mode='markers',
         marker=dict(size=15, color='red', symbol='x'),
@@ -354,39 +359,47 @@ def render_report_window(detections, image_name, processing_time, model_name, co
 # ============================================
 
 def render_inspection():
-    st.markdown("### Загрузка изображения")
-    
-    # Заметная область загрузки с рамкой и инструкцией
     st.markdown("""
-    <div style="
-        border: 3px dashed #000000;
-        background: #fafafa;
-        padding: 50px 30px;
-        text-align: center;
-        margin: 20px 0;
-        cursor: pointer;
-    ">
-        <p style="font-size: 20px; font-weight: 700; margin: 0 0 15px 0; color: #000;">ПЕРЕТАЩИТЕ ФАЙЛ СЮДА</p>
-        <p style="font-size: 16px; color: #666; margin: 0 0 10px 0;">или нажмите кнопку ниже</p>
-    </div>
+    <style>
+        [data-testid="stFileUploader"] div[data-testid="stMarkdownContainer"] {
+            display: none !important;
+        }
+        
+        .stFileUploader button span {
+            display: none !important;
+        }
+ 
+        .stFileUploader button {
+            width: auto !important;
+            min-width: 120px !important;
+            justify-content: center !important;
+        }
+        
+        .stFileUploader button::before {
+            content: "ВЫБРАТЬ ФАЙЛ" !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+        }
+    </style>
     """, unsafe_allow_html=True)
     
     uploaded = st.file_uploader(
-        "Добавить изображение",
+        "",
         type=["jpg","jpeg","png","bmp"],
-        label_visibility="visible"
+        label_visibility="collapsed"
     )
     
     if uploaded:
         image = Image.open(uploaded)
+        # Конвертируем RGBA в RGB
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
         st.image(image, use_container_width=True)
         
         if st.button("АНАЛИЗИРОВАТЬ", type="primary", use_container_width=True):
             return image, True, uploaded.name
     
     return None, False, ""
-
-
 # ============================================
 # ГЛАВНАЯ
 # ============================================
@@ -404,17 +417,18 @@ def main():
         conf = st.slider("", 0.1, 0.9, 0.25, 0.05, label_visibility="collapsed")
         st.session_state['current_conf'] = conf
 
-        # Текущие метрики
         p, r, f1, f2, f3 = get_metrics_for_confidence(conf)
         st.caption(f"F1: {f1:.3f} | F2: {f2:.3f} | F3: {f3:.3f}")
 
         if model_choice == "Ансамбль":
             models, error = load_ensemble()
         else:
-            model, error = load_single_model(MODEL_PATHS[model_choice]); models = model
+            model, error = load_single_model(MODEL_PATHS[model_choice])
+            models = model
 
         if error:
-            st.error(error); models = None
+            st.error(error)
+            models = None
         else:
             st.success("Готово")
 
@@ -423,39 +437,82 @@ def main():
     with tab1:
         image, analyze, image_name = render_inspection()
         if image and analyze and models:
-            import time
-            start = time.time()
-            with st.spinner("Анализ..."):
-                results = predict_ensemble(models, image, conf) if model_choice == "Ансамбль" else predict_single(
-                    models, image, conf)
-            proc_time = time.time() - start
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(image, use_container_width=True)
-            with col2:
-                st.image(results[0].plot(), use_container_width=True)
-
-            detections = []
-            if results[0].boxes is not None:
-                model_names = results[0].names
-                unique = {}
-                for box in results[0].boxes:
-                    cls_id = int(box.cls[0])
-                    name = model_names.get(cls_id, f"Класс {cls_id}")
-                    c = float(box.conf[0])
-                    if name not in unique or c > unique[name]['confidence']:
-                        unique[name] = {"class": name, "confidence": c}
-                detections = sorted(unique.values(), key=lambda x: x['confidence'], reverse=True)
-
-            st.markdown("---")
-            render_report_window(detections, image_name, proc_time, model_choice, conf)
-
+            try:
+                import time
+                start = time.time()
+                with st.spinner("Анализ..."):
+                    if model_choice == "Ансамбль":
+                        results = predict_ensemble(models, image, conf)
+                    else:
+                        results = predict_single(models, image, conf)
+                    
+                    if results is None:
+                        st.error("Ошибка при анализе изображения. Попробуйте другое изображение или перезагрузите приложение.")
+                        st.stop()
+                        
+                proc_time = time.time() - start
+    
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(image, use_container_width=True)
+                with col2:
+                    if results[0] is not None:
+                        st.image(results[0].plot(), use_container_width=True)
+                    else:
+                        st.warning("Результаты не получены")
+    
+                detections = []
+                if results[0].boxes is not None:
+                    model_names = results[0].names
+                    unique = {}
+                    for box in results[0].boxes:
+                        cls_id = int(box.cls[0])
+                        name = model_names.get(cls_id, f"Класс {cls_id}")
+                        c = float(box.conf[0])
+                        if name not in unique or c > unique[name]['confidence']:
+                            unique[name] = {"class": name, "confidence": c}
+                    detections = sorted(unique.values(), key=lambda x: x['confidence'], reverse=True)
+    
+                st.markdown("---")
+                render_report_window(detections, image_name, proc_time, model_choice, conf)
+            except Exception as e:
+                st.error(f"Произошла ошибка: {str(e)}")
+                st.info("Попробуйте использовать другое изображение или перезагрузите страницу.")
     with tab2:
         render_dashboard()
 
     with tab3:
-        st.markdown("### Termit Weld CV\nРасширенная аналитика: F1/F2/F3, Precision/Recall по классам, PR-кривые.")
+        st.markdown("### О системе Termit Weld CV")
+        
+        st.markdown("""
+        **Назначение:** Автоматический контроль качества сварных соединений на основе компьютерного зрения.
+        
+        ### Классифицируемые дефекты:
+        - **Геометрический дефект** - нарушение формы сварного шва
+        - **Непровар** - отсутствие сплавления кромок
+        - **Трещина** - разрыв металла шва
+        - **Пористость** - газовые поры
+        - **Брызги** - частицы металла
+        
+        ### Метрики качества (mAP@0.5):
+        | Дефект | Точность |
+        |--------|----------|
+        | Геометрический дефект | 0.701 |
+        | Непровар | 0.784 |
+        | Трещина | 0.456 |
+        | Пористость | 0.785 |
+        | Брызги | 0.787 |
+        | **Среднее** | **0.703** |
+        
+        ### Технические требования:
+        - Форматы: JPG, JPEG, PNG, BMP
+        - Максимальный размер: 200 MB
+        """)
+        
+        st.markdown("### F-beta Score")
+        st.markdown("- **F1 (beta=1)** - баланс Precision и Recall")
+        st.markdown("- **F2 (beta=2)** - Recall важнее в 2 раза")
+        st.markdown("- **F3 (beta=3)** - максимальный приоритет Recall")
 
     st.markdown(f'<div class="footer"><p>Termit Weld CV &copy; {datetime.now().year}</p></div>', unsafe_allow_html=True)
 
