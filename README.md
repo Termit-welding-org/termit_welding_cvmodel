@@ -4,11 +4,11 @@
 
 ---
 
-## 🚀 Запуск веб-приложения
+##  Запуск веб-приложения
 
 Приложение доступно по ссылке:
 
-👉 [https://termitweldingcvmodel-rnnob4uvhbt4ddhjizkzbm.streamlit.app/](https://termitweldingcvmodel-rnnob4uvhbt4ddhjizkzbm.streamlit.app/)
+ [https://termitweldingcvmodel-rnnob4uvhbt4ddhjizkzbm.streamlit.app/](https://termitweldingcvmodel-rnnob4uvhbt4ddhjizkzbm.streamlit.app/)
 
 Функциональность:
 - Загрузка изображения сварного шва
