@@ -1,27 +1,48 @@
 #!/usr/bin/env python3
-"""
-Termit Weld CV - Профессиональная система контроля сварки
-Расширенная аналитика: F1/F2/F3, кривые по классам, PR-кривые
-"""
-
-import streamlit as st
-#try:
-#    import cv2
-#except ImportError:
-#    pass
-import numpy as np
-from ultralytics import YOLO
-from PIL import Image
 import os
+
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "0"
+os.environ["STREAMLIT_SERVER_MAX_UPLOAD_SIZE"] = "200"
+
+import sys
+import subprocess
+import streamlit as st
+
+def ensure_opencv():
+    for _ in range(3):
+        try:
+            import cv2
+            return True
+        except ImportError:
+            subprocess.run([sys.executable, "-m", "pip", "install", "opencv-python-headless==4.8.1.78", "--quiet"])
+    return False
+
+ensure_opencv()
+
+if not ensure_opencv():
+    st.error("Не удалось установить OpenCV")
+
+import torch
+
+torch.cuda.is_available = lambda: False
+torch.cuda.device_count = lambda: 0
+
+import numpy as np
+
+@st.cache_resource(ttl=3600)
+def get_yolo():
+    from ultralytics import YOLO
+    return YOLO
+
+YOLO = get_yolo()
+
+from PIL import Image
 from pathlib import Path
 import pandas as pd
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
-import torch
-torch.cuda.is_available = lambda: False
-torch.cuda.device_count = lambda: 0
+import time
 
 # ============================================
 # НАСТРОЙКА СТРАНИЦЫ
@@ -65,12 +86,74 @@ st.markdown("""
     .stTabs [aria-selected="true"] { background: transparent !important; color: #000 !important; border-bottom: 2px solid #000; font-weight: 700; }
     img { max-height: 450px !important; object-fit: contain !important; }
 
-    [data-testid="collapsedControl"] {
+    [data-testid="collapsedControl"] button::before {
+    content: "≡" !important;
+    font-size: 24px !important;
+    color: #000 !important;
+    }
+
+    [data-testid="stSidebar"] [class*="material-icons"],
+    [data-testid="stSidebar"] span[class*="icon"],
+    [data-testid="stSidebar"] .stSelectbox [class*="icon"],
+    [data-testid="stSidebar"] .stSlider [class*="icon"] {
+        display: none !important;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"]::after {
+        content: "▼" !important;
+        font-size: 10px !important;
+        position: absolute !important;
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+    }
+
+        .material-icons,
+    [class*="material-icons"],
+    span[class*="icon"],
+    [data-testid="stSidebar"] span,
+    .stSelectbox span,
+    .stSlider span {
+        font-size: 0 !important;
+        color: transparent !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+    }
+
+        .stTabs [data-baseweb="tab"] [class*="icon"],
+        .stTabs [data-baseweb="tab"] span,
+        .stTabs button svg,
+        .stTabs button [class*="material"] {
+        display: none !important;
+    }
+        [data-testid="stSidebar"] .stSelectbox div[role="button"] span,
+        [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] span,
+        [data-testid="stSidebar"] select + div span {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+        [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+   
+        button[kind="header"] {
+        display: none !important;
+    }
+
+        [data-testid="stSidebarCollapseButton"] {
         display: none !important;
     }
 
 </style>
 """, unsafe_allow_html=True)
+# ============================================
+# RE-IMPORT (after st.set_page_config)
+# All imports remain at top
+# ============================================
+
 
 # ============================================
 # КЛАССЫ
@@ -119,6 +202,7 @@ def calculate_f_beta(precision, recall, beta=1.0):
 
 
 def get_metrics_for_confidence(conf):
+    """Получить метрики для заданного порога (усредненные)"""
     precs = [np.interp(conf, list(P_CURVE_PER_CLASS[c].keys()), list(P_CURVE_PER_CLASS[c].values())) for c in
              CLASSES_RU]
     recalls = [np.interp(conf, list(R_CURVE_PER_CLASS[c].keys()), list(R_CURVE_PER_CLASS[c].values())) for c in
@@ -164,10 +248,10 @@ def predict_ensemble(models, image, conf):
         img_array = np.array(image)
         if len(img_array.shape) == 3 and img_array.shape[2] == 4:
             image = image.convert('RGB')
-        
+
         r1 = nano.predict(np.array(image), conf=conf, verbose=False)
         r2 = small.predict(np.array(image), conf=conf, verbose=False)
-        
+
         # Ансамбль: объединяем результаты
         if r1[0].boxes is None and r2[0].boxes is None:
             return r1
@@ -175,7 +259,7 @@ def predict_ensemble(models, image, conf):
             return r2
         if r2[0].boxes is None:
             return r1
-        
+
         return r1 if len(r1[0].boxes) >= len(r2[0].boxes) else r2
     except Exception as e:
         st.error(f"Ошибка ансамбля: {e}")
@@ -286,6 +370,7 @@ def render_dashboard():
     for i, cls_name in enumerate(CLASSES_RU):
         prec_vals = list(P_CURVE_PER_CLASS[cls_name].values())
         rec_vals = list(R_CURVE_PER_CLASS[cls_name].values())
+        # Сортируем по recall
         sorted_pairs = sorted(zip(rec_vals, prec_vals))
         rec_sorted, prec_sorted = zip(*sorted_pairs)
 
@@ -295,6 +380,7 @@ def render_dashboard():
             line=dict(color=colors[i], width=2)
         ))
 
+    # Текущая точка
     fig_pr.add_trace(go.Scatter(
         x=[r], y=[p], mode='markers',
         marker=dict(size=15, color='red', symbol='x'),
@@ -359,22 +445,30 @@ def render_report_window(detections, image_name, processing_time, model_name, co
 # ============================================
 
 def render_inspection():
+    # Убираем заголовок "Загрузка изображения"
+    # st.markdown("### Загрузка изображения")  # ЗАКОММЕНТИРОВАТЬ ЭТУ СТРОКУ
+
+    # CSS для скрытия всех текстов внутри file_uploader
     st.markdown("""
     <style>
+        /* Скрыть заголовок "upload" и "200MB per file..." */
         [data-testid="stFileUploader"] div[data-testid="stMarkdownContainer"] {
             display: none !important;
         }
-        
+
+        /* Скрыть текст "Browse files" на кнопке */
         .stFileUploader button span {
             display: none !important;
         }
- 
+
+        /* Сделать кнопку компактной, но видимой */
         .stFileUploader button {
             width: auto !important;
             min-width: 120px !important;
             justify-content: center !important;
         }
-        
+
+        /* Добавить свой текст на кнопку */
         .stFileUploader button::before {
             content: "ВЫБРАТЬ ФАЙЛ" !important;
             font-size: 14px !important;
@@ -382,24 +476,26 @@ def render_inspection():
         }
     </style>
     """, unsafe_allow_html=True)
-    
+
     uploaded = st.file_uploader(
         "",
-        type=["jpg","jpeg","png","bmp"],
+        type=["jpg", "jpeg", "png", "bmp"],
         label_visibility="collapsed"
     )
-    
+
     if uploaded:
         image = Image.open(uploaded)
         # Конвертируем RGBA в RGB
         if image.mode in ('RGBA', 'LA', 'P'):
             image = image.convert('RGB')
         st.image(image, use_container_width=True)
-        
+
         if st.button("АНАЛИЗИРОВАТЬ", type="primary", use_container_width=True):
             return image, True, uploaded.name
-    
+
     return None, False, ""
+
+
 # ============================================
 # ГЛАВНАЯ
 # ============================================
@@ -417,6 +513,7 @@ def main():
         conf = st.slider("", 0.1, 0.9, 0.25, 0.05, label_visibility="collapsed")
         st.session_state['current_conf'] = conf
 
+        # Текущие метрики
         p, r, f1, f2, f3 = get_metrics_for_confidence(conf)
         st.caption(f"F1: {f1:.3f} | F2: {f2:.3f} | F3: {f3:.3f}")
 
@@ -430,7 +527,7 @@ def main():
             st.error(error)
             models = None
         else:
-            st.success("Готово")
+            st.success("Модель готова к работе")
 
     tab1, tab2, tab3 = st.tabs(["Контроль", "Дашборд", "Информация"])
 
@@ -445,13 +542,14 @@ def main():
                         results = predict_ensemble(models, image, conf)
                     else:
                         results = predict_single(models, image, conf)
-                    
+
                     if results is None:
-                        st.error("Ошибка при анализе изображения. Попробуйте другое изображение или перезагрузите приложение.")
+                        st.error(
+                            "Ошибка при анализе изображения. Попробуйте другое изображение или перезагрузите приложение.")
                         st.stop()
-                        
+
                 proc_time = time.time() - start
-    
+
                 col1, col2 = st.columns(2)
                 with col1:
                     st.image(image, use_container_width=True)
@@ -460,7 +558,7 @@ def main():
                         st.image(results[0].plot(), use_container_width=True)
                     else:
                         st.warning("Результаты не получены")
-    
+
                 detections = []
                 if results[0].boxes is not None:
                     model_names = results[0].names
@@ -472,7 +570,7 @@ def main():
                         if name not in unique or c > unique[name]['confidence']:
                             unique[name] = {"class": name, "confidence": c}
                     detections = sorted(unique.values(), key=lambda x: x['confidence'], reverse=True)
-    
+
                 st.markdown("---")
                 render_report_window(detections, image_name, proc_time, model_choice, conf)
             except Exception as e:
@@ -483,17 +581,17 @@ def main():
 
     with tab3:
         st.markdown("### О системе Termit Weld CV")
-        
+
         st.markdown("""
         **Назначение:** Автоматический контроль качества сварных соединений на основе компьютерного зрения.
-        
+
         ### Классифицируемые дефекты:
         - **Геометрический дефект** - нарушение формы сварного шва
         - **Непровар** - отсутствие сплавления кромок
         - **Трещина** - разрыв металла шва
         - **Пористость** - газовые поры
         - **Брызги** - частицы металла
-        
+
         ### Метрики качества (mAP@0.5):
         | Дефект | Точность |
         |--------|----------|
@@ -503,12 +601,12 @@ def main():
         | Пористость | 0.785 |
         | Брызги | 0.787 |
         | **Среднее** | **0.703** |
-        
+
         ### Технические требования:
         - Форматы: JPG, JPEG, PNG, BMP
         - Максимальный размер: 200 MB
         """)
-        
+
         st.markdown("### F-beta Score")
         st.markdown("- **F1 (beta=1)** - баланс Precision и Recall")
         st.markdown("- **F2 (beta=2)** - Recall важнее в 2 раза")
